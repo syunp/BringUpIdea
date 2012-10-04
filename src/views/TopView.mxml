@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:View xmlns:fx="http://ns.adobe.com/mxml/2009"
+		xmlns:s="library://ns.adobe.com/flex/spark"
+		actionBarVisible="false" backgroundAlpha="0.7" backgroundColor="0xE7E18F"
+		creationComplete="init()" fontFamily="_sans" tabBarVisible="true"
+		title="Bring Up The Idea !!!!">
+	<fx:Script>
+		<![CDATA[
+			import flashx.textLayout.formats.TextAlign;
+			import mx.events.CloseEvent;
+			import spark.components.ViewNavigator;
+			import spark.primitives.Graphic;
+//			import spark.transitions.CrossFadeViewTransition;
+			
+//			private var fade:CrossFadeViewTransition = new CrossFadeViewTransition();
+			private var already:Boolean=false;
+			
+			private function init():void{
+				//var ab:ViewNavigator = new ViewNavigator();
+				//ab.hideActionBar(false);
+				makeTitle();
+				var orgDB:File = File.applicationDirectory.resolvePath("Idea_01.sqlite");
+				var copyDB:File = File.applicationStorageDirectory.resolvePath("Idea_01.sqlite");
+				if (!copyDB.exists)
+				{
+					var parentD:File = copyDB.parent;
+					parentD.createDirectory();
+					// 非同期的コピーは失敗する;
+					try
+					{
+//						copyDB.deleteFile();
+						orgDB.copyTo(copyDB);
+					}
+					catch (error:SQLError)
+					{
+					}
+				}
+				else
+				{
+					orgDB = null;
+				}
+				
+				var conn:SQLConnection = new SQLConnection();
+				conn.addEventListener(SQLEvent.OPEN, onOpen);
+				conn.openAsync(copyDB);
+				
+				var selectStmt:SQLStatement;
+				
+				function onOpen(e:SQLEvent):void{
+					conn.removeEventListener(SQLEvent.OPEN, onOpen);
+					
+					selectStmt = new SQLStatement();
+					selectStmt.sqlConnection = conn;
+					var sql:String = "SELECT name FROM user";
+					selectStmt.text = sql;
+					
+					selectStmt.addEventListener(SQLEvent.RESULT, resultHandler);
+					
+					selectStmt.execute();
+				}
+				function resultHandler(e:SQLEvent):void{
+					selectStmt.removeEventListener(SQLEvent.RESULT, resultHandler);
+					
+					var result:SQLResult = selectStmt.getResult();
+					
+					// ローカルのDBにidとnameが無かったら
+					if(result.data == null){
+						trace(2);
+						already=false;
+					}
+					else{
+						trace(1);
+						already=true;
+					}
+				}
+			}
+			private function makeTitle():void{
+				var type:String = GradientType.LINEAR; 
+				//var colors:Array=[0x000080,0x0000ff];
+				var colors:Array=[0x3333cc,0xc0c0ff];
+				var alphas:Array = [1, 1]; 
+				var ratios:Array = [0, 255]; 
+				var spreadMethod:String = SpreadMethod.PAD; 
+				var interp:String = InterpolationMethod.LINEAR_RGB; 
+				var focalPtRatio:Number = 0; 
+				
+				var matrix:Matrix = new Matrix(); 
+				var boxWidth:Number = 450; 
+				var boxHeight:Number = 220; 
+				var boxRotation:Number = -Math.PI/2; // 90° 
+				//var tx:Number = 25; 
+				//var ty:Number = 0; 
+				matrix.createGradientBox(boxWidth, boxHeight,boxRotation); 
+				
+				var square:Shape = new Shape; 
+				square.graphics.beginGradientFill(type,  
+					colors, 
+					alphas, 
+					ratios,  
+					matrix,  
+					spreadMethod,  
+					interp,  
+					focalPtRatio); 
+				square.graphics.drawRoundRect(0, 0, 450, 220,50); 
+				s.addChild(square);
+				square.x = 20;
+				square.y = 10
+				
+				var tfmt:TextFormat=new TextFormat();
+				tfmt.size = 80;
+				tfmt.color = 0xffffee;
+				var t:TextField = new TextField();
+				t.defaultTextFormat=tfmt;
+				t.autoSize=TextAlign.CENTER;
+				t.text="Bring Up \n The Idea!";
+				t.x=70;
+				t.y=30; 
+				s.addChild(t);
+			}
+			protected function registButton_clickHandler(event:MouseEvent):void
+			{
+				if(already){
+					
+					/*
+					ローカルのDBから自分の名前を抜き出し、サーバー上のDBに検索をかける
+					該当したもののmap_idを取り出す関数
+					*/
+					search_mine();
+					
+//					navigator.pushView(views.BringUpIdeaHomeView);
+				}
+				else{
+//					navigator.defaultPushTransition=fade;
+//					navigator.defaultPopTransition=fade;
+					navigator.pushView(views.Registry);
+				}
+			}
+			
+			private function search_mine():void{
+				var copyDB:File = File.applicationStorageDirectory.resolvePath("Idea_01.sqlite");
+				
+				var conn:SQLConnection = new SQLConnection();
+				conn.addEventListener(SQLEvent.OPEN, onOpen);
+				conn.openAsync(copyDB);
+				
+				var selectStmt:SQLStatement;
+				
+				function onOpen(e:SQLEvent):void{
+					conn.removeEventListener(SQLEvent.OPEN, onOpen);
+					
+					selectStmt = new SQLStatement();
+					selectStmt.sqlConnection = conn;
+					var sql:String = "SELECT name FROM user";
+					selectStmt.text = sql;
+					
+					selectStmt.addEventListener(SQLEvent.RESULT, resultHandler);
+					
+					selectStmt.execute();
+				}
+				
+				function resultHandler(e:SQLEvent):void{
+					selectStmt.removeEventListener(SQLEvent.RESULT, resultHandler);
+					
+					var result:SQLResult = selectStmt.getResult();
+					
+					get_map_id(result.data[0].name);
+					
+				}
+				
+				/*
+				creater_nameを投げて、map_idを取得する関数
+				*/
+				function get_map_id(s:String):void{
+					System.useCodePage = true;
+					
+					var request:URLRequest = new URLRequest("http://www45.atpages.jp/peso0217/getMapId.php");
+					request.method = URLRequestMethod.POST;
+					
+					var variable:URLVariables = new URLVariables();
+					var val:Object = new Object();
+					
+					val["creater_name"] = s;
+					
+					for(var key1:String in val){
+						variable["val["+key1+"]"] = val[key1];
+					}
+					
+					request.data = variable;
+					var loader:URLLoader = new URLLoader();
+					loader.dataFormat = URLLoaderDataFormat.TEXT;
+					loader.addEventListener(Event.COMPLETE, onComp);
+					loader.load(request);
+					
+					function onComp(e:Event):void{
+						var loader:URLLoader = e.target as URLLoader;
+						loader.removeEventListener(Event.COMPLETE, onComp);
+						//						trace(loader.data);
+						
+						var vars:URLVariables = new URLVariables(e.target.data);
+						//↓これがmap_id
+						//trace(vars.map_id);
+						navigator.pushView(views.BringUpIdeaHomeView);
+					}
+				}
+			}
+			
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<!-- 非ビジュアルエレメント (サービス、値オブジェクトなど) をここに配置 -->
+	</fx:Declarations>
+	<s:SpriteVisualElement id="s"/>
+	<s:Button id="startButton" x="182" y="631" width="117" label="登録"
+			  click="registButton_clickHandler(event)"/>
+	<s:Image x="14" y="247" width="452" height="356" source="flower.png"/>
+</s:View>

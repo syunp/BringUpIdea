@@ -1,0 +1,370 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:View xmlns:fx="http://ns.adobe.com/mxml/2009"
+		xmlns:s="library://ns.adobe.com/flex/spark" backgroundColor="0xE7E18F" backgroundAlpha="0.7" creationComplete="search_random()">
+	<fx:Script>
+		<![CDATA[
+			import flashx.textLayout.formats.TextAlign;
+			private var sp:Sprite = new Sprite();
+			private var invisibleSp:Sprite = new Sprite();
+			private var line:Sprite = new Sprite();
+			private var plus:Boolean = false;
+			private var add:Boolean = false;
+			
+			private var sp_arr:Array = new Array();
+			
+			private var start_x:uint = 0;
+			private var start_y:uint = 0;
+			private var end_x:uint = 0;
+			private var end_y:uint = 0;
+			
+			private var dx:int;
+			private var dy:int;
+			
+			private var map:Object = new Object();
+//			private var arr:Array = [];
+			private var mapId:int;
+			
+			private function receiveXML(varsId:uint):void{
+				var urlLoader:URLLoader = new URLLoader();
+				var req:URLRequest = new URLRequest("http://www45.atpages.jp/peso0217/getMapInfo_new.php");
+				req.method = URLRequestMethod.POST;
+				var variable:URLVariables = new URLVariables();
+				variable.map_id = varsId;
+				//trace("variable.map_id:"+variable.map_id)
+				req.data = variable;
+				
+				urlLoader.addEventListener(Event.COMPLETE, 
+					function(e:Event):void{
+						var xml:XML = new XML(e.target.data);
+						for each(var map_xml:XML in xml..map){
+							//							var obj:Object = {id:map_xml.@id, creater_name:map_xml.@creater_name, update:map_xml.@update, circles:[], links:[]};
+							map = {id:map_xml.@id, creater_name:map_xml.@creater_name, update:map_xml.@update, circles:[], links:[]};
+							for each(var circle_xml:XML in map_xml..circle){
+								map.circles.push({id:circle_xml.@id, text:circle_xml.@text, x:circle_xml.@x, y:circle_xml.@y});
+							}
+							for each(var link_xml:XML in map_xml..link){
+								map.links.push({from_id:link_xml.@from_id, to_id:link_xml.@from_id});
+							}
+							//							result.push(map);
+							//							trace(map.links[0].from_id);
+						}
+						
+						//						trace(map.links.length);
+						
+						var loader:URLLoader = e.target as URLLoader;
+						//trace(loader.data);
+						
+						//												trace(map.links[0].from_id);
+						drawMap();
+					}
+				);
+				
+				urlLoader.load(req);
+			}
+			private function search_random():void{
+				System.useCodePage = true;
+				
+				var request:URLRequest = new URLRequest("http://www45.atpages.jp/peso0217/getMapId_random.php");
+				var loader:URLLoader = new URLLoader();
+				loader.dataFormat = URLLoaderDataFormat.TEXT;
+				loader.addEventListener(Event.COMPLETE, onComp);
+				loader.load(request);
+				
+				function onComp(e:Event):void{
+					var loader:URLLoader = e.target as URLLoader;
+					loader.removeEventListener(Event.COMPLETE, onComp);
+										trace(loader.data);
+					
+					var vars:URLVariables = new URLVariables(e.target.data);
+					//↓これがmap_id
+					trace(vars.map_id);
+					receiveXML(vars.map_id);
+					mapId = vars.map_id;
+				}
+			}
+			private function drawMap():void{
+				stage.scaleMode = StageScaleMode.NO_SCALE;
+				stage.align = StageAlign.TOP_LEFT;
+				
+				var w:int = stage.stageWidth;
+				var h:int = stage.stageHeight;
+				var w2:int = stage.stageWidth/2;
+				var h2:int = stage.stageHeight/2;
+				
+				//見えない背景を設置
+				invisibleSp.graphics.beginFill(0xbc763c, 0.8);
+				invisibleSp.graphics.drawRect(-w+w2,-h+h2,w*2,h*2);
+				invisibleSp.graphics.endFill();
+				s.addChild(invisibleSp);
+				
+				//描画できる範囲を線で囲む
+				var waku:Sprite = new Sprite();
+				waku.graphics.lineStyle(1);
+				waku.graphics.moveTo(-w+w2,-h+h2);
+				waku.graphics.lineTo(w+w2,-h+h2);
+				waku.graphics.lineTo(w+w2,h+h2);
+				waku.graphics.lineTo(-w+w2,h+h2);
+				waku.graphics.lineTo(-w+w2,-h+h2);
+				s.addChild(waku);
+				
+				//s.addChild(line);
+				
+				
+				for(var n:int=0 ; n<map.circles.length ; n++){
+					sp = new Sprite();
+					var t:TextField = new TextField();
+					t.autoSize = TextAlign.CENTER;
+					t.text=map.circles[n].text;
+					trace(t.text)
+					
+					if(t.width>70){
+						t.width=70;
+						t.wordWrap=true;
+					}
+					t.scaleX = t.scaleY = 2;
+					t.mouseEnabled=false;
+					t.x = -t.width/2;
+					t.y = -t.height/2;
+					sp.addChild(t);
+					
+					
+					
+					if(map.circles[n].x==stage.stageWidth/2 && map.circles[n].y==stage.stageHeight/2){
+						sp.graphics.lineStyle(3,0xFF0000);
+					}
+					else{
+						sp.graphics.lineStyle(3,0xff6600);
+					}
+					sp.graphics.beginFill(0xffffee);
+					sp.graphics.drawEllipse(-t.width*0.6, -t.height*0.6, t.width*1.2, t.height*1.2);
+					sp.graphics.endFill();
+					
+					trace(map.circles[n].x);
+					s.addChild(sp);
+					sp_arr.push(sp);
+					sp_arr[n].x = map.circles[n].x;
+					sp_arr[n].y = map.circles[n].y;
+					
+				}
+				
+				//葉の部分
+				invisibleSp.addChild(line);
+				for(i=0; i<map.circles.length; i++){
+					line.graphics.lineStyle(2, 0x339900);
+					trace(map.circles[i].x);
+					line.graphics.moveTo(map.circles[i].x, map.circles[i].y);
+					line.graphics.lineTo(map.circles[i].x, int(map.circles[i].y)+40+t.height/3);
+					line.graphics.lineTo(int(map.circles[i].x)-20, int(map.circles[i].y)+30+t.height/3);
+					line.graphics.moveTo(map.circles[i].x, int(map.circles[i].y)+40+t.height/3);
+					line.graphics.lineTo(int(map.circles[i].x)+20, int(map.circles[i].y)+30+t.height/3);
+				}
+				
+				
+				line.graphics.lineStyle(2);
+				var first:Boolean=true;
+				for(var i:int=0 ; i<map.links.length ; i++){
+					for(var j:int=0 ; j<map.circles.length ; j++){
+						//trace("aaaaaaa"+map.circles[j].id);
+						if(map.links[i].from_id==map.circles[j].id){
+							if(first){
+								line.graphics.moveTo(map.circles[i].x,map.circles[i].y);
+								//trace("aiueo"+map.circles[j].x);
+								first=false;
+							}
+							else{
+								line.graphics.lineTo(map.circles[j].x,map.circles[j].y);
+								first=true;
+							}
+						}
+						if(map.links[i].to_id==map.circles[j].id){
+							if(first){
+								line.graphics.moveTo(map.circles[i].x,map.circles[i].y);
+								first=false;
+							}
+							else{
+								//trace("ai"+map.circles[j].x);
+								line.graphics.lineTo(map.circles[j].x,map.circles[j].y);
+								first=true;
+							}
+						}
+						
+						invisibleSp.addChild(line);
+					}
+				}
+				
+				invisibleSp.addEventListener(MouseEvent.MOUSE_DOWN,startDragSp);
+				invisibleSp.addEventListener(MouseEvent.MOUSE_UP,stopDragSp);
+				button.addEventListener(MouseEvent.CLICK, b_click);
+			}
+//				
+				
+			
+			private function startDragSp(e:MouseEvent):void{
+				dx = mouseX - s.x;
+				dy = mouseY - s.y;
+				addEventListener(MouseEvent.MOUSE_MOVE, mouseMove);
+			}
+			private function stopDragSp(e:MouseEvent):void{
+				removeEventListener(MouseEvent.MOUSE_MOVE,startDragSp);
+				removeEventListener(MouseEvent.MOUSE_MOVE,mouseMove);
+			}
+			private function mouseMove(e:MouseEvent):void{
+				s.x = mouseX - dx;
+				s.y = mouseY - dy;
+			}
+			
+			private function b_click(e:MouseEvent):void{
+				mapName.enabled=true;
+				trace("b_click");
+				
+				for(var i:uint = 0; i<sp_arr.length; i++){
+					sp_arr[i].addEventListener(MouseEvent.CLICK, first_Click);
+				}
+				
+				invisibleSp.removeEventListener(MouseEvent.CLICK, second_Click);
+			}
+			
+			private function first_Click(e:MouseEvent):void{
+				trace("first_click");
+				
+				start_x = e.target.x;
+				start_y = e.target.y;
+				invisibleSp.addEventListener(MouseEvent.CLICK, second_Click);
+			}
+			
+		
+			private var obj:Object = new Object();
+			private var values:Object = new Object();
+			private var count:int = 0;
+			
+			private function second_Click(e:MouseEvent):void{	
+				if(mapName.text.length>0){
+				trace("second_click");
+				
+//				P = new Param();
+//				P.map_id=mapId;
+				
+				obj = new Object();
+				obj["map_id"] = mapId;
+				
+				var t:TextField = new TextField();
+				t.autoSize = TextAlign.CENTER;
+				t.text=mapName.text;
+//				P.text = t.text;
+				
+				obj["text"] = t.text;
+				
+				if(t.width>70){
+					t.width=70;
+					t.wordWrap=true;
+				}
+				t.scaleX = t.scaleY = 2;
+				t.mouseEnabled=false;
+				t.x = e.localX - t.width/2;
+				t.y = e.localY - t.height/2;
+//				P.from_x=t.x;
+//				P.from_y=t.y;
+				
+				
+				var new_sp:Sprite = new Sprite();
+				s.addChild(new_sp);
+				new_sp.graphics.lineStyle(3,0xff6600);
+				new_sp.graphics.beginFill(0xffffee);
+				new_sp.graphics.drawEllipse(-t.width*0.6, -t.height*0.6, t.width*1.2,t.height*1.2);
+				new_sp.graphics.endFill();
+				new_sp.x = e.localX;
+				new_sp.y = e.localY;
+				s.addChild(t);
+				sp_arr.push(new_sp);
+				
+				
+				line.graphics.lineStyle(2, 0x339900);
+				line.graphics.moveTo(new_sp.x, new_sp.y);
+				line.graphics.lineTo(new_sp.x, int(new_sp.y)+40+t.height/3);
+				line.graphics.lineTo(int(new_sp.x)-20, int(new_sp.y)+30+t.height/3);
+				line.graphics.moveTo(new_sp.x, int(new_sp.y)+40+t.height/3);
+				line.graphics.lineTo(int(new_sp.x)+20, int(new_sp.y)+30+t.height/3);
+				
+				
+				line.graphics.lineStyle(2, 0x0);
+				line.graphics.moveTo(start_x, start_y);
+				line.graphics.lineTo(new_sp.x, new_sp.y);
+				invisibleSp.addChild(line);
+				invisibleSp.setChildIndex(line,0);
+				
+				obj["from_x"] = start_x;
+				obj["from_y"] = start_y;
+				obj["to_x"] = new_sp.x;
+				obj["to_y"] = new_sp.y;
+				
+				values[count] = obj;
+				count++;
+				
+				for(var i:uint = 0; i<sp_arr.length; i++){
+					sp_arr[i].removeEventListener(MouseEvent.CLICK, first_Click);
+				}
+				
+//				arr.push(P);
+				
+				mapName.text="";
+				mapName.enabled=false;
+				invisibleSp.removeEventListener(MouseEvent.CLICK, second_Click);
+			}
+			}
+			
+			
+			protected function button1_clickHandler(event:MouseEvent):void
+			{
+				
+				php_send();
+				
+				count = 0;
+				obj = new Object();
+				values = new Object();
+				
+			}
+			
+			private var variable:URLVariables = new URLVariables();
+			
+			private function php_send():void{
+				System.useCodePage = true;
+				
+				var request:URLRequest = new URLRequest("http://www45.atpages.jp/peso0217/othersMapUpdate.php");
+				request.method = URLRequestMethod.POST;
+				
+				variable = new URLVariables();
+				for(var key1:String in values){
+					for(var key2:String in values[key1]){
+						variable["values["+key1+"]["+key2+"]"] = values[key1][key2];
+					}
+				}
+				request.data = variable;
+				var loader:URLLoader = new URLLoader();
+				loader.dataFormat = URLLoaderDataFormat.TEXT;
+				loader.addEventListener(Event.COMPLETE, onComp);
+				loader.load(request);
+				
+				function onComp(e:Event):void{
+					var loader:URLLoader = e.target as URLLoader;
+					loader.removeEventListener(Event.COMPLETE, onComp);
+					trace(loader.data);
+					navigator.popView()
+				}
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<!-- 非ビジュアルエレメント (サービス、値オブジェクトなど) をここに配置 -->
+	</fx:Declarations>
+	<s:navigationContent>
+		<s:Button label="Save" click="button1_clickHandler(event)"/>
+	</s:navigationContent>
+	<s:actionContent>
+		<s:Button id="button" label="+"/>
+	</s:actionContent>
+	<s:titleContent>
+		<s:TextInput id="mapName" width="289" enabled="false" prompt="新規マップ作成"/>
+	</s:titleContent>
+	<s:SpriteVisualElement id="s"/>
+</s:View>

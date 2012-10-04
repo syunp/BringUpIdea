@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:View xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		xmlns:s="library://ns.adobe.com/flex/spark" backgroundColor="0xE7E18F" backgroundAlpha="0.7" title="登録">
+	<fx:Script>
+		<![CDATA[
+//			import spark.transitions.CrossFadeViewTransition;
+//			private var fade:CrossFadeViewTransition = new CrossFadeViewTransition();
+			
+			private function init():void{
+				var orgDB:File = File.applicationDirectory.resolvePath("Idea_01.sqlite");
+				var copyDB:File = File.applicationStorageDirectory.resolvePath("Idea_01.sqlite");
+				if(userID.text.length>0 && firstWord.text.length>0)
+				if (!copyDB.exists)
+				{
+					var parentD:File = copyDB.parent;
+					parentD.createDirectory();
+					// 非同期的コピーは失敗する;
+					try
+					{
+						//						copyDB.deleteFile();
+						orgDB.copyTo(copyDB);
+					}
+					catch (error:SQLError)
+					{
+					}
+				}
+				else
+				{
+					orgDB = null;
+				}
+				
+				var conn:SQLConnection = new SQLConnection();
+				conn.addEventListener(SQLEvent.OPEN, onOpen);
+				conn.openAsync(copyDB);
+				
+				var selectStmt:SQLStatement;
+				
+				function onOpen(e:SQLEvent):void{
+					conn.removeEventListener(SQLEvent.OPEN, onOpen);
+					
+					selectStmt = new SQLStatement();
+					selectStmt.sqlConnection = conn;
+					var sql:String = "SELECT name FROM user";
+					selectStmt.text = sql;
+					
+					selectStmt.addEventListener(SQLEvent.RESULT, resultHandler);
+					
+					selectStmt.execute();
+				}
+				
+				function resultHandler(e:SQLEvent):void{
+					selectStmt.removeEventListener(SQLEvent.RESULT, resultHandler);
+					
+					var result:SQLResult = selectStmt.getResult();
+					
+					// ローカルのDBにidとnameが無かったら
+					if(result.data == null){
+						// 追加する
+												selectStmt = new SQLStatement();
+												selectStmt.sqlConnection = conn;
+												var sql:String = "INSERT INTO user VALUES(NULL, '"+userID.text+"')";
+												selectStmt.text = sql;
+												
+												selectStmt.execute();
+						
+						trace(2);
+						
+						/*
+						ここからテスト
+						
+						名前と最初のワードを入力した後に、サーバー上にアップロードする
+						サーバーに渡すもの　map.creater_name, circle.txt, circle.x, circle.y
+						*/
+						
+						php_send();
+//						navigator.defaultPushTransition=fade;
+						navigator.pushView(views.BringUpIdeaHomeView);
+					}
+					else{
+						trace(1);
+						
+					}
+				}
+			}
+			/*
+			登録時にサーバーのDBに入れるための関数
+			*/
+			private function php_send():void{
+				System.useCodePage = true;
+				
+				var request:URLRequest = new URLRequest("http://www45.atpages.jp/peso0217/insertDB_first.php");
+				request.method = URLRequestMethod.POST;
+				
+				var variable:URLVariables = new URLVariables();
+				var val:Object = new Object();
+				
+				// 渡すもの（実際は計算結果や持ってきたもの）
+				var name:String = userID.text;
+				var first_text:String = firstWord.text;
+				var first_x:int = stage.stageWidth/2;
+				var first_y:int = stage.stageHeight/2;
+				
+				val["name"] = name;
+				val["first_text"] = first_text;
+				val["first_x"] = first_x;
+				val["first_y"] = first_y;
+				
+				for(var key1:String in val){
+					variable["val["+key1+"]"] = val[key1];
+				}
+				
+				request.data = variable;
+				var loader:URLLoader = new URLLoader();
+				loader.dataFormat = URLLoaderDataFormat.TEXT;
+				loader.addEventListener(Event.COMPLETE, onComp);
+				loader.load(request);
+				
+				function onComp(e:Event):void{
+					var loader:URLLoader = e.target as URLLoader;
+					loader.removeEventListener(Event.COMPLETE, onComp);
+					trace(loader.data);
+					
+				}
+			}
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<!-- 非ビジュアルエレメント (サービス、値オブジェクトなど) をここに配置 -->
+	</fx:Declarations>
+	<s:navigationContent>
+		<s:Button label="戻る" click="navigator.popView()"/>
+	</s:navigationContent>
+	<s:TextInput id="userID" x="129" y="230" width="222"/>
+	<s:TextArea id="firstWord" x="129" y="402" width="222" height="51"/>
+	<s:Label x="216" y="185" fontFamily="ＭＳ ゴシック" text="名前"/>
+	<s:Label x="166" y="356" fontFamily="ＭＳ ゴシック" text="アイデアの種"/>
+	<s:Button x="169" y="518" label="メニューへ" click="init()"/>
+	<s:Label x="53" y="72" fontFamily="ＭＳ ゴシック" text="まずはあなたの名前と&#xd;　アイデアの種を入力してください"/>
+</s:View>
